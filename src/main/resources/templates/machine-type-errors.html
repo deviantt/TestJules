@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <title>Machine Type Errors</title>
+    <meta charset="UTF-8">
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .container { display: flex; gap: 30px; }
+        .column { flex: 1; padding: 15px; border: 1px solid #ccc; border-radius: 5px; }
+        h1, h2, h3 { color: #333; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; }
+        select, input[type="text"] {
+            width: 100%;
+            padding: 8px;
+            margin-bottom: 15px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        button {
+            padding: 10px 15px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-right: 5px;
+        }
+        .select-btn { background-color: #007bff; color: white; }
+        .save-btn { background-color: #28a745; color: white; }
+        .add-btn { background-color: #17a2b8; color: white; font-size: 0.8em; padding: 3px 6px;}
+        .remove-btn { background-color: #dc3545; color: white; font-size: 0.8em; padding: 3px 6px;}
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background-color: #f2f2f2; }
+        .machine-type-details p { margin: 5px 0; }
+        .error-list { max-height: 300px; overflow-y: auto; }
+        #assignedErrorsContainer li, #availableErrorsContainer li {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 5px;
+            border-bottom: 1px solid #eee;
+        }
+         #assignedErrorsContainer li:last-child, #availableErrorsContainer li:last-child {
+            border-bottom: none;
+        }
+    </style>
+</head>
+<body>
+    <h1>Manage Machine Type Errors</h1>
+
+    <div>
+        <form th:action="@{/type}" method="get">
+            <label for="machineTypeSelect">Select Machine Type:</label>
+            <select id="machineTypeSelect" name="name" onchange="this.form.submit()">
+                <option value="">-- Select Type --</option>
+                <option th:each="mt : ${machineTypes}"
+                        th:value="${mt.name}"
+                        th:text="${mt.name}"
+                        th:selected="${selectedMachineType != null && selectedMachineType.name == mt.name}"></option>
+            </select>
+            <noscript><button type="submit" class="select-btn">Load Type</button></noscript>
+        </form>
+         <a th:href="@{/type/create}" style="display:inline-block; margin-top:10px; margin-bottom:20px;">Create New Machine Type</a>
+    </div>
+
+    <div th:if="${selectedMachineType}">
+        <h2 th:text="'Details for ' + ${selectedMachineType.name}">Machine Type Details</h2>
+        <div class="machine-type-details">
+            <p><strong>Name:</strong> <span th:text="${selectedMachineType.name}"></span></p>
+            <p><strong>Firmware:</strong> <span th:text="${selectedMachineType.firmware}"></span></p>
+        </div>
+
+        <form th:action="@{/type/save}" method="post">
+            <input type="hidden" name="name" th:value="${selectedMachineType.name}" />
+            <div class="container">
+                <div class="column">
+                    <h3>Assigned Errors</h3>
+                    <ul id="assignedErrorsContainer" class="error-list">
+                        <!-- Populated by JavaScript -->
+                        <li th:each="error : ${assignedErrorsFull}" th:attr="data-uniqueid=${error.uniqueId}">
+                            <span th:text="${error.uniqueId + ' - ' + error.description}"></span>
+                            <button type="button" class="remove-btn" onclick="removeError(this)">Remove</button>
+                        </li>
+                    </ul>
+                </div>
+
+                <div class="column">
+                    <h3>Available Errors</h3>
+                    <ul id="availableErrorsContainer" class="error-list">
+                         <li th:each="error : ${allErrors}" th:attr="data-uniqueid=${error.uniqueId}"
+                            th:unless="${#lists.contains(assignedErrorsFull.![uniqueId], error.uniqueId)}">
+                            <span th:text="${error.uniqueId + ' - ' + error.description}"></span>
+                            <button type="button" class="add-btn" onclick="addError(this)">Add</button>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+            <!-- Hidden inputs for errorUniqueIds will be managed by JavaScript -->
+            <div id="hiddenErrorInputsContainer">
+                <input th:each="err : ${assignedErrorsFull}" type="hidden" name="errorUniqueIds" th:value="${err.uniqueId}" />
+            </div>
+
+            <button type="submit" class="save-btn" style="margin-top:20px;">Save Changes for <span th:text="${selectedMachineType.name}"></span></button>
+        </form>
+    </div>
+    <div th:unless="${selectedMachineType}" style="margin-top:20px;">
+        <p>Please select a machine type to view and manage its errors.</p>
+    </div>
+
+    <script>
+        function addError(button) {
+            const errorLi = button.parentNode;
+            const uniqueId = errorLi.getAttribute('data-uniqueid');
+            const description = errorLi.querySelector('span').textContent;
+
+            // Move to assigned list
+            document.getElementById('assignedErrorsContainer').appendChild(errorLi);
+            button.textContent = 'Remove';
+            button.className = 'remove-btn';
+            button.onclick = function() { removeError(this); };
+
+            // Add hidden input
+            const input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = 'errorUniqueIds';
+            input.value = uniqueId;
+            input.id = 'hidden-input-' + uniqueId;
+            document.getElementById('hiddenErrorInputsContainer').appendChild(input);
+        }
+
+        function removeError(button) {
+            const errorLi = button.parentNode;
+            const uniqueId = errorLi.getAttribute('data-uniqueid');
+            const description = errorLi.querySelector('span').textContent;
+
+            // Move back to available list
+            document.getElementById('availableErrorsContainer').appendChild(errorLi);
+            button.textContent = 'Add';
+            button.className = 'add-btn';
+            button.onclick = function() { addError(this); };
+
+            // Remove hidden input
+            const inputToRemove = document.getElementById('hidden-input-' + uniqueId);
+            if (inputToRemove) {
+                inputToRemove.remove();
+            }
+        }
+
+        // Initialize hidden inputs based on server-rendered assigned errors on page load
+        // This script ensures that if JavaScript is disabled, the form still submits the initially assigned errors.
+        // And if JS is enabled, this setup is correct for the add/remove functions.
+        // The server already renders these, this is more for ensuring the JS logic is consistent if we were to build the list purely client-side.
+        // For this specific setup, the th:each for hidden inputs in the form is sufficient for non-JS submission.
+        // The JS functions dynamically add/remove these to ensure the POST request has the correct list.
+    </script>
+</body>
+</html>

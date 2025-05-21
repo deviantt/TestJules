@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <title>Create Machine Type</title>
+    <meta charset="UTF-8">
+    <style>
+        .form-container {
+            margin-top: 20px;
+            padding: 15px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            max-width: 500px;
+        }
+        .form-container h3 {
+            margin-top: 0;
+        }
+        .form-container label {
+            display: block;
+            margin-bottom: 5px;
+        }
+        .form-container input[type="text"] {
+            width: calc(100% - 16px);
+            padding: 8px;
+            margin-bottom: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        .form-container button {
+            padding: 10px 15px;
+            background-color: #28a745;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .form-container a {
+            display: inline-block;
+            margin-top: 10px;
+            color: #007bff;
+            text-decoration: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="form-container">
+        <h3>Create New Machine Type</h3>
+        <!-- The controller uses "newMachineType" as the model attribute name in showCreateMachineTypeForm -->
+        <form th:action="@{/type/create}" th:object="${newMachineType}" method="post">
+            <div>
+                <label for="name">Machine Type Name:</label>
+                <input type="text" id="name" th:field="*{name}" required />
+            </div>
+            <div>
+                <label for="firmware">Firmware Version:</label>
+                <input type="text" id="firmware" th:field="*{firmware}" required />
+            </div>
+            <!-- Errors list will be empty by default for a new machine type -->
+            <input type="hidden" th:field="*{errors}" />
+
+            <button type="submit">Create Machine Type</button>
+        </form>
+        <a th:href="@{/type}">Cancel and Back to Machine Types</a>
+    </div>
+</body>
+</html>
