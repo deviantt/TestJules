@@ -8,4 +8,6 @@ import java.util.Optional;
 public interface MachineErrorRepository extends MongoRepository<MachineError, String> {
 
     Optional<MachineError> findByUniqueId(Integer uniqueId);
+
+    Optional<MachineError> findTopByOrderByUniqueIdDesc();
 }

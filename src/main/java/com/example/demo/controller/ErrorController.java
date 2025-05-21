@@ -1,5 +1,6 @@
 package com.example.demo.controller;
 
+import com.example.demo.exception.ErrorAssignedException;
 import com.example.demo.model.MachineError;
 import com.example.demo.service.MachineErrorService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -32,8 +33,12 @@ public class ErrorController {
 
     @PostMapping("/delete/{id}")
     public String deleteError(@PathVariable String id) {
-        machineErrorService.deleteError(id);
-        return "redirect:/all";
+        try {
+            machineErrorService.deleteError(id);
+            return "redirect:/all";
+        } catch (ErrorAssignedException e) {
+            return "redirect:/all?error=assigned";
+        }
     }
 
     // Shows the form for editing an error

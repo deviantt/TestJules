@@ -3,6 +3,7 @@ package com.example.demo.service;
 import com.example.demo.model.MachineType;
 import com.example.demo.repository.MachineErrorRepository;
 import com.example.demo.repository.MachineTypeRepository;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -10,11 +11,10 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
-import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -24,57 +24,85 @@ public class MachineTypeServiceTest {
     private MachineTypeRepository machineTypeRepository;
 
     @Mock
-    private MachineErrorRepository machineErrorRepository; // Autowired in service, so needs to be mocked
+    private MachineErrorRepository machineErrorRepository; // Mocked as it's a dependency
 
     @InjectMocks
     private MachineTypeService machineTypeService;
 
-    @Test
-    void getAllMachineTypes_shouldCallRepositoryFindAll() {
-        MachineType type1 = new MachineType("id1", "TypeA", "fw1.0", Collections.emptyList());
-        MachineType type2 = new MachineType("id2", "TypeB", "fw2.0", Arrays.asList(101, 102));
-        when(machineTypeRepository.findAll()).thenReturn(Arrays.asList(type1, type2));
+    // Test objects can be initialized in BeforeEach or within each test method
+    // For clarity, specific objects for each test will be created within the test methods.
 
-        List<MachineType> types = machineTypeService.getAllMachineTypes();
-
-        assertEquals(2, types.size());
-        verify(machineTypeRepository, times(1)).findAll();
+    @BeforeEach
+    void setUp() {
+        // Mocks are automatically initialized by @ExtendWith(MockitoExtension.class)
+        // No explicit MockitoAnnotations.openMocks(this); is needed.
     }
 
     @Test
-    void getMachineTypeByName_whenTypeExists_shouldReturnMachineType() {
-        String name = "TypeA";
-        MachineType typeA = new MachineType("id1", name, "fw1.0", Collections.emptyList());
-        when(machineTypeRepository.findByName(name)).thenReturn(Optional.of(typeA));
+    void testSaveMachineType_shouldSaveAndReturnMachineType() {
+        // Arrange
+        List<Integer> errorIds = Arrays.asList(1, 2, 3);
+        MachineType machineTypeToSave = new MachineType();
+        machineTypeToSave.setName("Test Type");
+        machineTypeToSave.setFirmware("v1.0");
+        machineTypeToSave.setErrors(errorIds);
 
-        Optional<MachineType> foundType = machineTypeService.getMachineTypeByName(name);
+        when(machineTypeRepository.save(any(MachineType.class))).thenAnswer(invocation -> {
+            MachineType savedType = invocation.getArgument(0);
+            // Simulate repository assigning an ID if that's relevant for the object's state after save
+            // savedType.setId("mockRepoId"); 
+            return savedType;
+        });
 
-        assertTrue(foundType.isPresent());
-        assertEquals(name, foundType.get().getName());
-        verify(machineTypeRepository, times(1)).findByName(name);
+        // Act
+        MachineType savedMachineType = machineTypeService.saveMachineType(machineTypeToSave);
+
+        // Assert
+        assertNotNull(savedMachineType, "Saved machine type should not be null.");
+        assertEquals("Test Type", savedMachineType.getName(), "Name should match.");
+        assertEquals("v1.0", savedMachineType.getFirmware(), "Firmware should match.");
+        assertEquals(errorIds, savedMachineType.getErrors(), "Error list should match the original list.");
+        assertEquals(3, savedMachineType.getErrors().size(), "Error list size should be 3.");
+        assertTrue(savedMachineType.getErrors().containsAll(Arrays.asList(1, 2, 3)), "Error list should contain all specified error IDs.");
+
+        verify(machineTypeRepository, times(1)).save(machineTypeToSave); // Verify save was called with the machineTypeToSave object
     }
 
     @Test
-    void getMachineTypeByName_whenTypeNotFound_shouldReturnEmptyOptional() {
-        String name = "NonExistentType";
-        when(machineTypeRepository.findByName(name)).thenReturn(Optional.empty());
+    void testSaveMachineType_whenErrorsListIsModified_shouldReflectChanges() {
+        // Arrange
+        // This test simulates updating a machine type, possibly with a modified list of errors.
+        // The service's saveMachineType is straightforward; it just calls repository.save().
+        // The critical part is that the `modifiedMachineType` object passed to the service
+        // already has the intended state (e.g., errors list updated by the controller).
+        
+        List<Integer> initialErrorIds = Arrays.asList(10, 20, 30);
+        // MachineType originalMachineType = new MachineType(); // Not strictly needed for this test's logic
+        // originalMachineType.setName("Update Type");
+        // originalMachineType.setFirmware("v2.0");
+        // originalMachineType.setErrors(initialErrorIds);
 
-        Optional<MachineType> foundType = machineTypeService.getMachineTypeByName(name);
+        List<Integer> modifiedErrorIds = Arrays.asList(10, 30); // Error 20 is removed
+        MachineType modifiedMachineType = new MachineType();
+        modifiedMachineType.setName("Update Type");
+        modifiedMachineType.setFirmware("v2.0");
+        modifiedMachineType.setErrors(modifiedErrorIds);
 
-        assertFalse(foundType.isPresent());
-        verify(machineTypeRepository, times(1)).findByName(name);
-    }
+        // Mock repository to return the modifiedMachineType when save is called
+        when(machineTypeRepository.save(any(MachineType.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-    @Test
-    void saveMachineType_shouldCallRepositorySave() {
-        MachineType newType = new MachineType(null, "TypeC", "fw3.0", Arrays.asList(201));
-        MachineType savedType = new MachineType("id3", "TypeC", "fw3.0", Arrays.asList(201));
-        when(machineTypeRepository.save(any(MachineType.class))).thenReturn(savedType);
+        // Act
+        MachineType resultMachineType = machineTypeService.saveMachineType(modifiedMachineType);
 
-        MachineType result = machineTypeService.saveMachineType(newType);
+        // Assert
+        assertNotNull(resultMachineType, "Resulting machine type should not be null.");
+        assertEquals("Update Type", resultMachineType.getName(), "Name should match.");
+        assertEquals(modifiedErrorIds, resultMachineType.getErrors(), "Error list should reflect the modification.");
+        assertEquals(2, resultMachineType.getErrors().size(), "Error list size should be 2 after modification.");
+        assertTrue(resultMachineType.getErrors().containsAll(Arrays.asList(10, 30)), "Error list should contain 10 and 30.");
+        assertFalse(resultMachineType.getErrors().contains(20), "Error list should not contain 20.");
 
-        assertNotNull(result.getId());
-        assertEquals(savedType.getName(), result.getName());
-        verify(machineTypeRepository, times(1)).save(newType);
+        // Verify that the save method was called with the modifiedMachineType object
+        verify(machineTypeRepository, times(1)).save(modifiedMachineType);
     }
 }

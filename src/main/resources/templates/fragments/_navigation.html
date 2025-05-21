@@ -1,0 +1,9 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+    <div th:fragment="navPanel" style="position: fixed; top: 10px; right: 10px; padding: 10px; background-color: #f0f0f0; border: 1px solid #ccc; border-radius: 5px; z-index: 1000;">
+        <a th:href="@{/all}" style="text-decoration: none; margin-right: 15px;">Errors</a>
+        <a th:href="@{/type}" style="text-decoration: none;">Machine Types</a>
+    </div>
+</body>
+</html>

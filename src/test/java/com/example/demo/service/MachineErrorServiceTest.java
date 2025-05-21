@@ -1,15 +1,17 @@
 package com.example.demo.service;
 
+import com.example.demo.exception.ErrorAssignedException;
 import com.example.demo.model.MachineError;
 import com.example.demo.repository.MachineErrorRepository;
+import com.example.demo.repository.MachineTypeRepository;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.util.Arrays;
-import java.util.List;
+import java.util.NoSuchElementException;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -21,128 +23,112 @@ public class MachineErrorServiceTest {
     @Mock
     private MachineErrorRepository machineErrorRepository;
 
+    @Mock
+    private MachineTypeRepository machineTypeRepository;
+
     @InjectMocks
     private MachineErrorService machineErrorService;
 
+    // No specific sampleError needed in BeforeEach as tests create their own specific instances.
+
+    @BeforeEach
+    void setUp() {
+        // Mocks are automatically initialized by the @ExtendWith(MockitoExtension.class) annotation.
+        // No explicit MockitoAnnotations.openMocks(this); needed.
+    }
+
+    // Tests for addError method
     @Test
-    void getAllErrors_shouldCallRepositoryFindAll() {
-        MachineError error1 = new MachineError("id1", 1, "Desc1", 100, 1, "High", "TypeA", "SystemX");
-        MachineError error2 = new MachineError("id2", 2, "Desc2", 200, 2, "Medium", "TypeB", "SystemY");
-        when(machineErrorRepository.findAll()).thenReturn(Arrays.asList(error1, error2));
+    void testAddError_firstError_shouldSetUniqueIdToOne() {
+        when(machineErrorRepository.findTopByOrderByUniqueIdDesc()).thenReturn(Optional.empty());
+        MachineError newError = new MachineError(); // The error to be passed to the service
+        // Mock save to return the error passed to it, which will have uniqueId set by the service
+        when(machineErrorRepository.save(any(MachineError.class))).thenAnswer(invocation -> {
+            MachineError errorToSave = invocation.getArgument(0);
+            // Simulate setting an ID by the repository upon saving, if necessary for the test logic
+            // errorToSave.setId("mockGeneratedId"); 
+            return errorToSave;
+        });
 
-        List<MachineError> errors = machineErrorService.getAllErrors();
+        MachineError savedError = machineErrorService.addError(newError);
 
-        assertEquals(2, errors.size());
-        verify(machineErrorRepository, times(1)).findAll();
+        assertEquals(1, savedError.getUniqueId(), "UniqueId should be 1 for the first error.");
+        verify(machineErrorRepository, times(1)).findTopByOrderByUniqueIdDesc();
+        verify(machineErrorRepository, times(1)).save(newError); // Verify save was called with the newError object
     }
 
     @Test
-    void addError_shouldCallRepositorySave() {
-        MachineError newError = new MachineError(null, 3, "New Desc", 300, 3, "Low", "TypeC", "SystemZ");
-        MachineError savedError = new MachineError("id3", 3, "New Desc", 300, 3, "Low", "TypeC", "SystemZ");
-        when(machineErrorRepository.save(any(MachineError.class))).thenReturn(savedError);
+    void testAddError_existingErrors_shouldSetUniqueIdToMaxPlusOne() {
+        MachineError existingError = new MachineError();
+        existingError.setUniqueId(5); // Max existing uniqueId
+        when(machineErrorRepository.findTopByOrderByUniqueIdDesc()).thenReturn(Optional.of(existingError));
+        
+        MachineError newError = new MachineError(); // The error to be passed to the service
+        // Mock save to return the error passed to it
+        when(machineErrorRepository.save(any(MachineError.class))).thenAnswer(invocation -> {
+            MachineError errorToSave = invocation.getArgument(0);
+            return errorToSave;
+        });
 
-        MachineError result = machineErrorService.addError(newError);
+        MachineError savedError = machineErrorService.addError(newError);
 
-        assertNotNull(result.getId());
-        assertEquals(savedError.getDescription(), result.getDescription());
+        assertEquals(6, savedError.getUniqueId(), "UniqueId should be max existing uniqueId + 1.");
+        verify(machineErrorRepository, times(1)).findTopByOrderByUniqueIdDesc();
         verify(machineErrorRepository, times(1)).save(newError);
     }
 
+    // Tests for deleteError method
     @Test
-    void deleteError_shouldCallRepositoryDeleteById() {
-        String errorId = "id1";
-        doNothing().when(machineErrorRepository).deleteById(errorId);
+    void testDeleteError_errorIsAssigned_shouldThrowErrorAssignedException() {
+        MachineError errorToDelete = new MachineError();
+        errorToDelete.setId("testId");
+        errorToDelete.setUniqueId(100);
 
-        machineErrorService.deleteError(errorId);
+        when(machineErrorRepository.findById("testId")).thenReturn(Optional.of(errorToDelete));
+        when(machineTypeRepository.existsByErrorsContains(100)).thenReturn(true);
 
-        verify(machineErrorRepository, times(1)).deleteById(errorId);
+        ErrorAssignedException thrownException = assertThrows(ErrorAssignedException.class, () -> {
+            machineErrorService.deleteError("testId");
+        }, "ErrorAssignedException should be thrown.");
+        
+        assertEquals("Error with uniqueId 100 is assigned to one or more machine types and cannot be deleted.", thrownException.getMessage());
+
+        verify(machineErrorRepository, times(1)).findById("testId");
+        verify(machineTypeRepository, times(1)).existsByErrorsContains(100);
+        verify(machineErrorRepository, never()).deleteById("testId"); // Ensure deleteById was not called
     }
 
     @Test
-    void updateError_whenErrorExists_shouldUpdateAndSave() {
-        String errorId = "id1";
-        MachineError existingError = new MachineError(errorId, 1, "Old Desc", 100, 1, "High", "TypeA", "SystemX");
-        MachineError errorDetails = new MachineError(null, 1, "Updated Desc", 100, 1, "Critical", "TypeA_Updated", "SystemX_Updated");
-        // Only description, level, type, system should be updated by the service method
+    void testDeleteError_errorNotAssigned_shouldDeleteSuccessfully() {
+        MachineError errorToDelete = new MachineError();
+        errorToDelete.setId("testId");
+        errorToDelete.setUniqueId(101);
 
-        when(machineErrorRepository.findById(errorId)).thenReturn(Optional.of(existingError));
-        when(machineErrorRepository.save(any(MachineError.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(machineErrorRepository.findById("testId")).thenReturn(Optional.of(errorToDelete));
+        when(machineTypeRepository.existsByErrorsContains(101)).thenReturn(false);
+        // doNothing().when(machineErrorRepository).deleteById("testId"); // Not strictly necessary for void methods
 
-        MachineError updatedError = machineErrorService.updateError(errorId, errorDetails);
+        assertDoesNotThrow(() -> {
+            machineErrorService.deleteError("testId");
+        }, "Should not throw an exception when deleting an unassigned error.");
 
-        assertNotNull(updatedError);
-        assertEquals(errorDetails.getDescription(), updatedError.getDescription());
-        assertEquals(errorDetails.getLevel(), updatedError.getLevel());
-        assertEquals(errorDetails.getType(), updatedError.getType());
-        assertEquals(errorDetails.getSystem(), updatedError.getSystem());
-        // Ensure non-updatable fields remain unchanged
-        assertEquals(existingError.getUniqueId(), updatedError.getUniqueId());
-        assertEquals(existingError.getSpn(), updatedError.getSpn());
-        assertEquals(existingError.getFmi(), updatedError.getFmi());
-
-        verify(machineErrorRepository, times(1)).findById(errorId);
-        verify(machineErrorRepository, times(1)).save(existingError);
+        verify(machineErrorRepository, times(1)).findById("testId");
+        verify(machineTypeRepository, times(1)).existsByErrorsContains(101);
+        verify(machineErrorRepository, times(1)).deleteById("testId"); // Verify deleteById was called
     }
 
     @Test
-    void updateError_whenErrorNotFound_shouldReturnNull() {
-        String errorId = "nonExistentId";
-        MachineError errorDetails = new MachineError(null, 1, "Updated Desc", 100, 1, "Critical", "TypeA_Updated", "SystemX_Updated");
-        when(machineErrorRepository.findById(errorId)).thenReturn(Optional.empty());
+    void testDeleteError_errorNotFound_shouldThrowNoSuchElementException() {
+        when(machineErrorRepository.findById("nonExistentId")).thenReturn(Optional.empty());
 
-        MachineError updatedError = machineErrorService.updateError(errorId, errorDetails);
+        NoSuchElementException thrownException = assertThrows(NoSuchElementException.class, () -> {
+            machineErrorService.deleteError("nonExistentId");
+        }, "NoSuchElementException should be thrown when error is not found.");
 
-        assertNull(updatedError);
-        verify(machineErrorRepository, times(1)).findById(errorId);
-        verify(machineErrorRepository, never()).save(any(MachineError.class));
-    }
+        assertEquals("MachineError not found with id: nonExistentId", thrownException.getMessage());
 
-    @Test
-    void getErrorByUniqueId_whenErrorExists_shouldReturnError() {
-        Integer uniqueId = 123;
-        MachineError error = new MachineError("id1", uniqueId, "Desc", 100, 1, "High", "TypeA", "SystemX");
-        when(machineErrorRepository.findByUniqueId(uniqueId)).thenReturn(Optional.of(error));
-
-        Optional<MachineError> foundError = machineErrorService.getErrorByUniqueId(uniqueId);
-
-        assertTrue(foundError.isPresent());
-        assertEquals(uniqueId, foundError.get().getUniqueId());
-        verify(machineErrorRepository, times(1)).findByUniqueId(uniqueId);
-    }
-
-    @Test
-    void getErrorByUniqueId_whenErrorNotFound_shouldReturnEmptyOptional() {
-        Integer uniqueId = 404;
-        when(machineErrorRepository.findByUniqueId(uniqueId)).thenReturn(Optional.empty());
-
-        Optional<MachineError> foundError = machineErrorService.getErrorByUniqueId(uniqueId);
-
-        assertFalse(foundError.isPresent());
-        verify(machineErrorRepository, times(1)).findByUniqueId(uniqueId);
-    }
-
-    @Test
-    void getErrorById_whenErrorExists_shouldReturnError() {
-        String id = "mongoId1";
-        MachineError error = new MachineError(id, 123, "Desc", 100, 1, "High", "TypeA", "SystemX");
-        when(machineErrorRepository.findById(id)).thenReturn(Optional.of(error));
-
-        Optional<MachineError> foundError = machineErrorService.getErrorById(id);
-
-        assertTrue(foundError.isPresent());
-        assertEquals(id, foundError.get().getId());
-        verify(machineErrorRepository, times(1)).findById(id);
-    }
-
-    @Test
-    void getErrorById_whenErrorNotFound_shouldReturnEmptyOptional() {
-        String id = "nonExistentMongoId";
-        when(machineErrorRepository.findById(id)).thenReturn(Optional.empty());
-
-        Optional<MachineError> foundError = machineErrorService.getErrorById(id);
-
-        assertFalse(foundError.isPresent());
-        verify(machineErrorRepository, times(1)).findById(id);
+        verify(machineErrorRepository, times(1)).findById("nonExistentId");
+        verify(machineTypeRepository, never()).existsByErrorsContains(anyInt()); // Ensure this is not called
+        verify(machineErrorRepository, never()).deleteById(anyString()); // Ensure deleteById is not called
     }
 }

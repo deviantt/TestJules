@@ -64,7 +64,13 @@
     </style>
 </head>
 <body>
+<div th:replace="~{fragments/_navigation :: navPanel}"></div>
+
     <h1>All Machine Errors</h1>
+
+    <div th:if="${param.error == 'assigned'}" style="color: red; border: 1px solid red; padding: 10px; margin-bottom: 15px;">
+        Warning: The selected error is currently assigned to one or more machine types and cannot be deleted.
+    </div>
 
     <table>
         <thead>
@@ -101,10 +107,6 @@
     <div class="form-container">
         <h3>Add New Error</h3>
         <form th:action="@{/all/add}" th:object="${newError}" method="post">
-            <div>
-                <label for="uniqueId">Unique ID:</label>
-                <input type="number" id="uniqueId" th:field="*{uniqueId}" required />
-            </div>
             <div>
                 <label for="description">Description:</label>
                 <input type="text" id="description" th:field="*{description}" required />

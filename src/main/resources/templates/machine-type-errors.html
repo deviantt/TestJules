@@ -46,6 +46,7 @@
     </style>
 </head>
 <body>
+<div th:replace="~{fragments/_navigation :: navPanel}"></div>
     <h1>Manage Machine Type Errors</h1>
 
     <div>
@@ -97,7 +98,7 @@
             </div>
             <!-- Hidden inputs for errorUniqueIds will be managed by JavaScript -->
             <div id="hiddenErrorInputsContainer">
-                <input th:each="err : ${assignedErrorsFull}" type="hidden" name="errorUniqueIds" th:value="${err.uniqueId}" />
+                <input th:each="err : ${assignedErrorsFull}" type="hidden" name="errorUniqueIds" th:value="${err.uniqueId}" th:id="'hidden-input-' + ${err.uniqueId}" />
             </div>
 
             <button type="submit" class="save-btn" style="margin-top:20px;">Save Changes for <span th:text="${selectedMachineType.name}"></span></button>
