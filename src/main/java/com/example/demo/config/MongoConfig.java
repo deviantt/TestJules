@@ -10,12 +10,15 @@ import org.springframework.data.mongodb.core.MongoTemplate;
 @Configuration
 public class MongoConfig extends AbstractMongoClientConfiguration {
 
-    @Value("${spring.data.mongodb.uri:mongodb://localhost/testdb}")
+    @Value("${spring.data.mongodb.uri}")
     private String mongoUri;
+
+    @Value("${spring.data.mongodb.database}")
+    private String dbName;
 
     @Override
     protected String getDatabaseName() {
-        return "machinery";
+        return dbName;
     }
 
     @Override
