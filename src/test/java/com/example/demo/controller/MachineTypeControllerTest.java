@@ -164,13 +164,25 @@ public class MachineTypeControllerTest {
     void createMachineType_shouldCallServiceAndRedirect() throws Exception {
         MachineType newMachineType = new MachineType(null, "TypeD", "fw4.0", Collections.emptyList());
         when(machineTypeService.saveMachineType(any(MachineType.class)))
-            .thenReturn(new MachineType("id4", "TypeD", "fw4.0", Collections.emptyList()));
+            .thenAnswer(invocation -> {
+                MachineType typePassedToService = invocation.getArgument(0);
+                // Simulate repository assigning an ID
+                // typePassedToService.setId("id4"); // Not strictly needed for this redirect test if ID isn't used in redirect
+                return typePassedToService; // Return the (potentially modified) instance
+            });
 
         mockMvc.perform(post("/type/create")
-                .flashAttr("newMachineType", newMachineType))
+                .param("name", newMachineType.getName())
+                .param("firmware", newMachineType.getFirmware())
+                // Assuming errors are not submitted in this specific test case for simplicity,
+                // or add .param("errors", "...") if needed.
+                )
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/type?name=" + newMachineType.getName()));
 
-        verify(machineTypeService, times(1)).saveMachineType(any(MachineType.class));
+        verify(machineTypeService, times(1)).saveMachineType(argThat(savedType ->
+            newMachineType.getName().equals(savedType.getName()) &&
+            newMachineType.getFirmware().equals(savedType.getFirmware())
+        ));
     }
 }
